@@ -11,22 +11,15 @@ const MAX_LIMIT = 100;
 
 matchesRouter.get("/", async (req, res) => {
   const parsed = listMatchesQuerySchema.safeParse(req.query);
-  if(!parsed.success) {
+  if (!parsed.success) {
     return res.status(400).json({
       error: "Invalid request query",
       details: parsed.error.issues,
     });
   }
+
   const limit = Math.min(parsed.data.limit ?? 50, MAX_LIMIT);
-<<<<<<< HEAD
-  try{
-    const data = await db
-    .select()
-    .from(matches)
-    .orderBy((desc(matches.createdAt)))
-    .limit(limit);
-    return res.status(200).json({ data });
-=======
+
   try {
     const rows = await db
       .select()
@@ -46,9 +39,7 @@ matchesRouter.get("/", async (req, res) => {
     );
 
     return res.status(200).json({ data: rows });
->>>>>>> 4cf0bba (implement coderabbitai suggestions)
-  }
-  catch (error) {
+  } catch (error) {
     console.error("Failed to list matches:", error);
     return res.status(500).json({ error: "Failed to list matches" });
   }
