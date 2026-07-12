@@ -17,7 +17,7 @@ matchesRouter.get("/", async (req, res) => {
       details: JSON.stringify(parsed.error),
     });
   }
-  const { limit } = Math.min(parsed.data.limit ?? 50,MAX_LIMIT);
+  const limit = Math.min(parsed.data.limit ?? 50, MAX_LIMIT);
   try{
     const data = await db
     .select()
