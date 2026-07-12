@@ -1,9 +1,9 @@
 import { Router } from "express";
 import { db } from "../db/db.js";
 import { matches } from "../db/schema.js";
-import { getMatchStatus } from "../utils/match-status.js";
 import { createMatchSchema, listMatchesQuerySchema } from "../validation/matches.js";
-import { desc } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
+import { getMatchStatus, syncMatchStatus } from "../utils/match-status.js";
 
 export const matchesRouter = Router();
 
@@ -14,10 +14,11 @@ matchesRouter.get("/", async (req, res) => {
   if(!parsed.success) {
     return res.status(400).json({
       error: "Invalid request query",
-      details: JSON.stringify(parsed.error),
+      details: parsed.error.issues,
     });
   }
   const limit = Math.min(parsed.data.limit ?? 50, MAX_LIMIT);
+<<<<<<< HEAD
   try{
     const data = await db
     .select()
@@ -25,9 +26,31 @@ matchesRouter.get("/", async (req, res) => {
     .orderBy((desc(matches.createdAt)))
     .limit(limit);
     return res.status(200).json({ data });
+=======
+  try {
+    const rows = await db
+      .select()
+      .from(matches)
+      .orderBy(desc(matches.createdAt))
+      .limit(limit);
+
+    await Promise.all(
+      rows.map((match) =>
+        syncMatchStatus(match, async (nextStatus) => {
+          await db
+            .update(matches)
+            .set({ status: nextStatus })
+            .where(eq(matches.id, match.id));
+        }),
+      ),
+    );
+
+    return res.status(200).json({ data: rows });
+>>>>>>> 4cf0bba (implement coderabbitai suggestions)
   }
   catch (error) {
-    return res.status(500).json({ error: "Failed to list matches", details: JSON.stringify(error) });
+    console.error("Failed to list matches:", error);
+    return res.status(500).json({ error: "Failed to list matches" });
   }
 });
 
@@ -37,7 +60,7 @@ matchesRouter.post("/", async (req, res) => {
   if (!parsed.success) {
     return res.status(400).json({
       error: "Invalid request body",
-      details: parsed.error.flatten(),
+      details: parsed.error.issues,
     });
   }
 
