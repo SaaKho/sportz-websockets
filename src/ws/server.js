@@ -1,37 +1,56 @@
-import WebSocket from 'ws';
+import { WebSocket, WebSocketServer } from 'ws';
 
-//create a helper function to send json data to the client
-function sendJson(socket, payload){
-    if(socket.readyState != WebSocket.OPEN)return ;
-    socket.send(JSON.stringify(payload));
+// Send JSON to a single client
+function sendJson(socket, payload) {
+  if (socket.readyState !== WebSocket.OPEN) return;
+  socket.send(JSON.stringify(payload));
 }
 
-function broadcast(wss, payload){
-    for(const client of wss.clients){
-        if(client.readyState != WebSocket.OPEN ) return;
-        client.send(JSON.stringify(payload));
+// Send JSON to every connected client
+function broadcast(wss, payload) {
+  for (const client of wss.clients) {
+    if (client.readyState !== WebSocket.OPEN) continue;
+    client.send(JSON.stringify(payload));
+  }
+}
+
+export function attachWebSocketServer(server) {
+  const wss = new WebSocketServer({
+    // Reuse the Express HTTP server: HTTP handles REST, ws handles upgrade requests
+    server,
+    // Only accept WebSocket connections on /ws, keeping them separate from REST routes
+    path: '/ws',
+    // Cap message size (10 MB) to limit abuse
+    maxPayload: 10 * 1024 * 1024,
+  });
+
+  wss.on('connection', (socket) => {
+    socket.isAlive = true;
+    socket.on('pong', () => {
+      socket.isAlive = true;
+    });
+    socket.on('error', console.error);
+
+    sendJson(socket, { message: 'Welcome to the WebSocket server!' });
+  });
+
+  // Heartbeat: ping every client, drop any that didn't answer the last ping
+  const interval = setInterval(() => {
+    for (const client of wss.clients) {
+      if (client.isAlive === false) {
+        client.terminate();
+        continue;
+      }
+      client.isAlive = false;
+      client.ping();
     }
-}
+  }, 30_000);
 
-export function attachWebSocketServer(server){
-    const wss = new WebSocket.Server({ 
-        server,//this function will receive the http server instance created by express and we will pass it to the websocket, http  will check REST request and ws will look for upgrade requeest, same server helps simplify 
-        path: '/ws',//this is the path where the websocket will listen for connections, we can use this to differentiate between different websocket endpoints. Keeps REST request separate from es request 
-        maxPayload: 1024 * 1024 * 10,//10mb max payload size, this is to prevent denial of service attacks, we can adjust this based on our needs, acts against security abuse 
+  wss.on('close', () => clearInterval(interval));
 
-     });
-     wss.on('connection', (socket) => {
-        console.log('New client connected');
-        sendJson(socket, { message: 'Welcome to the WebSocket server!' });
-        socket.on('error', console.error);
-     });
+  function broadcastMatchCreated(match) {
+    broadcast(wss, { type: 'match_created', data: match });
+  }
 
-     function broadcastMatchCreated(match){
-        broadcast(wss, {type: 'match_created', data: match});
-
-        return{broadcastMatchCreated};
-
-     }
-
-
+  return { broadcastMatchCreated };
 }
