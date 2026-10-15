@@ -1,0 +1,15 @@
+meta {
+  name: List Matches
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/matches
+  body: none
+  auth: none
+}
+
+params:query {
+  ~limit: 20
+}
